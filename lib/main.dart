@@ -4,12 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:upi_india/upi_india.dart';
 import 'package:nearby_connections/nearby_connections.dart';
+import 'package:progress_indicators/progress_indicators.dart';
 
 void main() => runApp(MyApp());
 
 class MyApp extends StatelessWidget {
   // This widget is the root of your application.
-  
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -18,10 +19,10 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.amber,
       ),
       home: Scaffold(
-        appBar: AppBar(
-          title: Text('Air Upi',
-              style: GoogleFonts.lobster(fontSize: 30, color: Colors.black)),
-        ),
+        // appBar: AppBar(
+        //   title: Text('Air Upi',
+        //       style: GoogleFonts.lobster(fontSize: 30, color: Colors.black)),
+        // ),
         resizeToAvoidBottomPadding: false,
         body: MyHomePage(),
       ),
@@ -38,6 +39,7 @@ class _MyHomePageState extends State<MyHomePage> {
   bool _locationpermission = false;
   bool _isAdvertiser = false;
   bool _hasReceivedId = false;
+  bool _isDiscovering = false;
   final String userName = Random().nextInt(10000).toString();
   final Strategy strategy = Strategy.P2P_STAR;
   String _receivedUPI = '';
@@ -62,21 +64,29 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   Future<String> initiateTransaction(String app) async {
-    UpiIndia upi = new UpiIndia(
-      app: app,
-      receiverUpiId: _receivedUPI,
-      receiverName: 'Received UPI',
-      transactionRefId: 'TestingId',
-      transactionNote: 'Testing sending 1 rs',
-      amount: 1.00,
-    );
-
-    String response = await upi.startTransaction();
+    UpiIndia upi;
+    String response;
+    try {
+      upi = new UpiIndia(
+        app: app,
+        receiverUpiId: _receivedUPI,
+        receiverName: 'Received UPI',
+        transactionRefId: 'TestingId',
+        transactionNote: 'Testing sending 1 rs',
+        amount: 1.00,
+      );
+      response = await upi.startTransaction();
+    } catch (e) {
+      Scaffold.of(context).showSnackBar(SnackBar(
+        content: Text(e.toString()),
+      ));
+    }
 
     return response;
   }
 
   void _askUPIid() {
+    _enteredUPI = "";
     showModalBottomSheet(
         context: context,
         builder: (builder) => Card(
@@ -92,8 +102,11 @@ class _MyHomePageState extends State<MyHomePage> {
                 ),
                 FlatButton(
                     onPressed: () {
-                      _startAdvertising(_enteredUPI);
-                      Navigator.of(context).pop();
+                      print(_enteredUPI.length);
+                      if (_enteredUPI.length > 0) {
+                        _startAdvertising(_enteredUPI);
+                        Navigator.of(context).pop();
+                      }
                     },
                     child: Icon(Icons.done),
                     shape: RoundedRectangleBorder(
@@ -122,8 +135,11 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   Future<void> _startDiscovery() async {
+    setState(() {
+      _isDiscovering = true;
+    });
     try {
-      bool a = await Nearby().startDiscovery(userName, strategy,
+      await Nearby().startDiscovery(userName, strategy,
           onEndpointFound: (id, name, serviceId) {
             // showSnackbar(
             //     'Advertiser found: ' + name + ' requesting connection!');
@@ -145,12 +161,36 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   Widget build(BuildContext context) {
-    return Padding(
-        padding: EdgeInsets.all(10),
-        child: Column(children: [
-          Expanded(
+    return Stack(alignment: Alignment.center, children: [
+      Container(
+        decoration: BoxDecoration(
+            gradient: LinearGradient(
+                begin: Alignment.topRight,
+                end: Alignment.bottomLeft,
+                colors: [Colors.blue, Colors.red])),
+      ),
+      Positioned(
+        height: MediaQuery.of(context).size.height,
+        child: Opacity(
+            opacity: 0.2,
+            child: Image.asset(
+              'bg.png',
+              fit: BoxFit.cover,
+            )),
+      ),
+      Positioned(
+          top: 40,
+          child: Text(
+            "AIR UPI",
+            style: GoogleFonts.asul(color: Colors.white, fontSize: 40),
+          )),
+      Container(
+        // color: Colors.amber,
+        // padding: EdgeInsets.only(top: 60),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Flexible(
               flex: 1,
-              child: Column(children: [
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
                 SizedBox(
                   height: 20,
                 ),
@@ -190,52 +230,80 @@ class _MyHomePageState extends State<MyHomePage> {
                       ),
                       onTap: () async {
                         await Nearby().stopAdvertising();
+                        setState(() {
+                          _isAdvertiser = false;
+                        });
                         showSnackbar('Stopped Advertising');
                       },
                     ),
                   ],
                 )),
                 SizedBox(
-                  height: 20,
+                  height: 10,
                 ),
-                Center(
-                  child: Wrap(children: <Widget>[
-                    GestureDetector(
-                      child: Card(
-                        elevation: 5,
-                        color: Colors.yellowAccent,
-                        child: Padding(
-                            padding: EdgeInsets.all(10),
-                            child: Text('Start Discovery',
-                                style: GoogleFonts.quicksand(
-                                    color: Colors.black, fontSize: 18))),
+                if (!_isAdvertiser)
+                  Container(
+                    height: 40,
+                    width: 40,
+                    decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white)),
+                    child: Center(
+                      child: Text(
+                        "OR",
+                        style: GoogleFonts.asul(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold),
                       ),
-                      onTap: () {
-                        setState(() {
-                          _isAdvertiser = false;
-                        });
-                        _startDiscovery();
-                      },
                     ),
-                    GestureDetector(
-                      child: Card(
-                        elevation: 5,
-                        color: Colors.pinkAccent,
-                        child: Padding(
-                            padding: EdgeInsets.all(10),
-                            child: Text('Stop Discovery',
-                                style: GoogleFonts.quicksand(
-                                  color: Colors.white,
-                                  fontSize: 18,
-                                ))),
-                      ),
-                      onTap: () async {
-                        await Nearby().stopDiscovery();
-                        showSnackbar('Stopped Discovering');
-                      },
-                    ),
-                  ]),
+                  ),
+                SizedBox(
+                  height: 10,
                 ),
+                if (!_isAdvertiser)
+                  Center(
+                    child: Wrap(children: <Widget>[
+                      GestureDetector(
+                        child: Card(
+                          elevation: 5,
+                          color: Colors.yellowAccent,
+                          child: Padding(
+                              padding: EdgeInsets.all(10),
+                              child: Text('Start Discovery',
+                                  style: GoogleFonts.quicksand(
+                                      color: Colors.black, fontSize: 18))),
+                        ),
+                        onTap: () {
+                          setState(() {
+                            _isAdvertiser = false;
+                            _hasReceivedId = false;
+                          });
+                          _startDiscovery();
+                        },
+                      ),
+                      GestureDetector(
+                        child: Card(
+                          elevation: 5,
+                          color: Colors.pinkAccent,
+                          child: Padding(
+                              padding: EdgeInsets.all(10),
+                              child: Text('Stop Discovery',
+                                  style: GoogleFonts.quicksand(
+                                    color: Colors.white,
+                                    fontSize: 18,
+                                  ))),
+                        ),
+                        onTap: () async {
+                          await Nearby().stopDiscovery();
+                          setState(() {
+                            _isDiscovering = false;
+                          });
+                          showSnackbar('Stopped Discovering');
+                        },
+                      ),
+                    ]),
+                  ),
                 SizedBox(
                   height: 20,
                 ),
@@ -247,7 +315,7 @@ class _MyHomePageState extends State<MyHomePage> {
                         color: Colors.orangeAccent,
                         child: Padding(
                             padding: EdgeInsets.all(10),
-                            child: Text('Stop All Connected Endpoints',
+                            child: Text('Disconnect All Devices',
                                 style: GoogleFonts.quicksand(
                                     color: Colors.black, fontSize: 18))),
                       ),
@@ -260,6 +328,23 @@ class _MyHomePageState extends State<MyHomePage> {
                 SizedBox(
                   height: 20,
                 ),
+                if (_isAdvertiser)
+                  Text('Broadcasting UPI...',
+                      style: GoogleFonts.quicksand(
+                          color: Colors.red,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold)),
+                SizedBox(
+                  height: 10,
+                ),
+                if (_isAdvertiser)
+                  HeartbeatProgressIndicator(
+                    child: Icon(
+                      Icons.whatshot,
+                      color: Colors.white,
+                    ),
+                  ),
+                if (_isDiscovering) Center(child: CircularProgressIndicator()),
                 if (_hasReceivedId)
                   Center(
                     child: GestureDetector(
@@ -280,60 +365,89 @@ class _MyHomePageState extends State<MyHomePage> {
                     ),
                   )
               ])),
-          Expanded(
-            flex: 1,
-            child: FutureBuilder(
-              future: _transaction,
-              builder: (BuildContext context, AsyncSnapshot snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting ||
-                    snapshot.data == null)
-                  return Text(' ');
-                else {
-                  switch (snapshot.data.toString()) {
-                    case UpiIndiaResponseError.APP_NOT_INSTALLED:
-                      return Text(
-                        'App not installed.',
-                      );
-                      break;
-                    case UpiIndiaResponseError.INVALID_PARAMETERS:
-                      return Text(
-                        'Requested payment is invalid.',
-                      );
-                      break;
-                    case UpiIndiaResponseError.USER_CANCELLED:
-                      return Text(
-                        'It seems like you cancelled the transaction.',
-                      );
-                      break;
-                    case UpiIndiaResponseError.NULL_RESPONSE:
-                      return Text(
-                        'No data received',
-                      );
-                      break;
-                    default:
-                      UpiIndiaResponse _upiResponse;
-                      _upiResponse = UpiIndiaResponse(snapshot.data);
-                      String txnId = _upiResponse.transactionId;
-                      String resCode = _upiResponse.responseCode;
-                      String txnRef = _upiResponse.transactionRefId;
-                      String status = _upiResponse.status;
-                      String approvalRef = _upiResponse.approvalRefNo;
-                      return Column(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: <Widget>[
-                          Text('Transaction Id: $txnId'),
-                          Text('Response Code: $resCode'),
-                          Text('Reference Id: $txnRef'),
-                          Text('Status: $status'),
-                          Text('Approval No: $approvalRef'),
-                        ],
-                      );
+          SizedBox(
+            height: 20,
+          ),
+          if (_transaction != null)
+            Flexible(
+              flex: 1,
+              child: FutureBuilder(
+                future: _transaction,
+                builder: (BuildContext context, AsyncSnapshot snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting ||
+                      snapshot.data == null)
+                    return Text(' ');
+                  else {
+                    switch (snapshot.data.toString()) {
+                      case UpiIndiaResponseError.APP_NOT_INSTALLED:
+                        return Text(
+                          'App not installed.',
+                        );
+                        break;
+                      case UpiIndiaResponseError.INVALID_PARAMETERS:
+                        return Text(
+                          'Requested payment is invalid.',
+                        );
+                        break;
+                      case UpiIndiaResponseError.USER_CANCELLED:
+                        return Text(
+                          'It seems like you cancelled the transaction.',
+                        );
+                        break;
+                      case UpiIndiaResponseError.NULL_RESPONSE:
+                        return Text(
+                          'No data received',
+                        );
+                        break;
+                      default:
+                        UpiIndiaResponse _upiResponse;
+                        _upiResponse = UpiIndiaResponse(snapshot.data);
+                        String txnId = _upiResponse.transactionId;
+                        String resCode = _upiResponse.responseCode;
+                        String txnRef = _upiResponse.transactionRefId;
+                        String status = _upiResponse.status;
+                        String approvalRef = _upiResponse.approvalRefNo;
+                        return Stack(alignment: Alignment.center, children: [
+                          Container(
+                            padding: EdgeInsets.all(15),
+                            decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(10)),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: <Widget>[
+                                Text(
+                                  'Transaction Id: $txnId',
+                                ),
+                                Text('Response Code: $resCode'),
+                                Text('Reference Id: $txnRef'),
+                                Text('Status: $status'),
+                                Text('Approval No: $approvalRef'),
+                                FlatButton(
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(18.0),
+                                        side: BorderSide(color: Colors.red)),
+                                    onPressed: () {
+                                      setState(() {
+                                        _transaction = null;
+                                      });
+                                    },
+                                    child: Text("Close"))
+                              ],
+                            ),
+                          ),
+                        ]);
+                    }
                   }
-                }
-              },
-            ),
-          )
-        ]));
+                },
+              ),
+            )
+        ]),
+      ),
+    ]);
   }
 
   void showSnackbar(dynamic a) {
@@ -354,6 +468,7 @@ class _MyHomePageState extends State<MyHomePage> {
             setState(() {
               _receivedUPI = str;
               _hasReceivedId = true;
+              _isDiscovering = false;
             });
           }
           // showSnackbar('Received UPI ID: ' + str + ' From ID: ' + endid);
